@@ -115,5 +115,12 @@ jobs:
       - name: Build
         run: dotnet build src/InsightFlow.Tests -c Release
 
+      # The AppHost services speak https://localhost with the ASP.NET Core development certificate and call each other
+      # over it; a clean runner does not trust that certificate. On Linux .NET reads the trusted dev cert through OpenSSL.
+      - name: Trust the ASP.NET Core development certificate
+        run: |
+          dotnet dev-certs https --trust
+          echo "SSL_CERT_DIR=$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs" >> "$GITHUB_ENV"
+
       - name: Integration tests (AppHost + containers)
         run: dotnet test --project src/InsightFlow.Tests -c Release --no-build --filter-trait "Category=Integration"
