@@ -1,7 +1,8 @@
+using InsightFlow.Domain.Admin;
 using InsightFlow.Domain.Tenancy;
 using InsightFlow.Domain.Workspace;
-using InsightFlow.Persistence;
-using InsightFlow.ServiceDefaults.Security;
+using InsightFlow.Repository;
+using InsightFlow.Foundation.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace InsightFlow.MigrationService;
@@ -52,6 +53,12 @@ internal sealed partial class DevelopmentDataSeeder(InsightFlowDbContext db, Tim
         if (!personalExists)
         {
             db.Folders.Add(Folder.CreatePersonalRoot(tenantId, DevelopmentIdentity.UserId, now));
+        }
+
+        // The dev user is a Sys-admin without a password (the development auth handler signs them in).
+        if (!await db.AppUsers.IgnoreQueryFilters().AnyAsync(u => u.TenantId == tenantId && u.UserName == DevelopmentIdentity.UserId, cancellationToken))
+        {
+            db.AppUsers.Add(AppUser.Create(tenantId, DevelopmentIdentity.UserId, DevelopmentIdentity.UserName, null, TenantRole.TenantAdmin, null, now));
         }
 
         var changes = await db.SaveChangesAsync(cancellationToken);
