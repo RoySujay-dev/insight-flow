@@ -117,10 +117,16 @@ jobs:
 
       # The AppHost services speak https://localhost with the ASP.NET Core development certificate and call each other
       # over it; a clean runner does not trust that certificate. On Linux .NET reads the trusted dev cert through OpenSSL.
+      # Exit code 4 is partial trust: OpenSSL (what .NET uses) is trusted, browser stores (NSS) are not, which is fine
+      # here. Any other failure, or a missing OpenSSL trust folder, still fails the step.
       - name: Trust the ASP.NET Core development certificate
         run: |
-          dotnet dev-certs https --trust
-          echo "SSL_CERT_DIR=$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs" >> "$GITHUB_ENV"
+          code=0
+          dotnet dev-certs https --trust || code=$?
+          if [ "$code" -ne 0 ] && [ "$code" -ne 4 ]; then exit "$code"; fi
+          trust_dir="$HOME/.aspnet/dev-certs/trust"
+          if [ -z "$(ls -A "$trust_dir" 2>/dev/null)" ]; then echo "::error::No OpenSSL trust in $trust_dir"; exit 1; fi
+          echo "SSL_CERT_DIR=$trust_dir:/usr/lib/ssl/certs" >> "$GITHUB_ENV"
 
       - name: Integration tests (AppHost + containers)
         run: dotnet test --project src/InsightFlow.Tests -c Release --no-build --filter-trait "Category=Integration"
